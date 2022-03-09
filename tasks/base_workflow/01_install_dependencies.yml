@@ -5,17 +5,47 @@
       - acl
       - sudo
       - python3-pexpect
+      - php
+      - php-fpm
+      - php-curl
+      - php-gmp
+      - php-intl
+      - php-mbstring
+      - php-xml
+      - php-zip
+      - php-ctype
+      - php-dom
+      - php-fileinfo
+      - php-iconv
+      - php-json
+      - php-opcache
+      - php-phar
+      - php-simplexml
+      - php-xmlreader
+      - php-xmlwriter
+      - php-tokenizer
+      - php-mysql
     state: present
   register: apt_status
   until: apt_status is success
   delay: 6
   retries: 10
 
-- name: Create temporary build directory for Guac
+- name: Remove Automatically installed Apache
+  package:
+    name:
+      - apache2
+    state: absent
+  register: apt_status
+  until: apt_status is success
+  delay: 6
+  retries: 10
+
+- name: Create temporary build directory for App
   ansible.builtin.tempfile:
     state: directory
-  register: my_app_temp_dir_raw
+  register: freshrss_temp_dir_raw
 
 - name: Play Temporary Path
   ansible.builtin.set_fact:
-    my_app_temp_dir: "{{ my_app_temp_dir_raw.path }}"
+    freshrss_temp_dir: "{{ freshrss_temp_dir_raw.path }}"

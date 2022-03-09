@@ -1,24 +1,151 @@
 ---
-- name: Edit my_app file already deployed
-  ansible.builtin.replace:
-    path: "{{ my_app_installed_config_file }}"
-    regexp: "TEXT_TO_FIND"
-    replace: "TEXT_TO_ADD"
-    owner: "{{ my_app_service_user }}"
-    group: "{{ my_app_service_user }}"
-    mode: '0700'
 
-- name: Deploy fresh app config file
-  ansible.builtin.template:
-    src: "{{ my_app_deployed_config_file }}"
-    dest: "{{ my_app_dir }}/CONFIG_PATH"
-    force: true
-    mode: '0700'  # Ansible-Lint hates when this isn't set
-
-- name: Own all of the my_app folder
+- name: Make Fresh RSS Etc folder
   ansible.builtin.file:
-    path: "{{ my_app_dir }}"
+    path: "{{ freshrss_etc }}"
+    state: directory
+    user: "{{ freshrss_service_user }}"
+    group: "{{ freshrss_service_user }}"
+    mode: '0755'
+
+- name: Find the php socket
+  ansible.builtin.find:
+    paths: "{{ php_home }}"
+    patterns: "php*.*.sock"
+    file_type: any
+  register: find_results
+
+- name: Set fact to found file
+  ansible.builtin.set_fact:
+    phpfpm_socket: "{{ (find_results.files | first).path }}"
+
+- name: Set MariaDB user password
+  ansible.builtin.slurp:
+    src: "/etc/mysql/user_{{ mariadb_dbuser }}"
+  register: mariadb_dbuser_pwd_raw
+  when: not (mariadb_dbuser_pwd | default(""))
+
+- name: Set fact to found file
+  ansible.builtin.set_fact:
+    mariadb_dbuser_pwd: "{{ mariadb_dbuser_pwd_raw.content }}"
+
+
+- name: Chown freshrss P
+  ansible.builtin.file:
+    path: "{{ freshrss_dir }}/p"
     state: directory
     recurse: true
-    owner: '{{ my_app_service_user }}'
-    group: '{{ my_app_service_user }}'
+    owner: '{{ nginx_user }}'
+    group: '{{ nginx_user }}'
+
+- name: Change the directory permissions for Fresh RSS dir
+  ansible.builtin.file:
+    path: "{{ freshrss_dir }}"
+    state: directory
+    recurse: true
+    mode: '0755'
+
+- name: Chown freshrss P
+  ansible.builtin.file:
+    path: "{{ freshrss_dir }}/data"
+    state: directory
+    recurse: true
+    owner: '{{ nginx_user }}'
+    group: '{{ nginx_user }}'
+
+- name: Template Nginx config file
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ nginx_default_config_path }}"
+    force: true
+    mode: '0770'
+  notify: "Restart Nginx"
+
+- name: Set Fresh RSS Admin Password since it was provided
+  ansible.builtin.set_fact:
+    freshrss_admin_password: "{{ freshrss_admin_pass }}"
+  when: freshrss_admin_pass
+  no_log: true
+
+- name: Create Fresh RSS Admin Password since it was not provided
+  ansible.builtin.set_fact:
+    freshrss_admin_password: "{{ lookup('community.general.random_string', length=24, special=false) }}"
+  when: not freshrss_admin_pass
+  no_log: true
+
+- name: Drop copy of Fresh RSS Admin Password on local box
+  ansible.builtin.copy:
+    content: "{{ freshrss_admin_password }}"
+    dest: "{{ freshrss_local_user_password_path }}"
+    force: true
+    owner: "root"
+    group: "root"
+    mode: "0700"
+  when: freshrss_local_user_password_path
+  no_log: true
+
+- name: Check if Fresh RSS has been initialized
+  ansible.builtin.stat:
+    path: "{{ fresrss_config_init_path }}"
+  register: fresrss_config_init
+
+- name: Initialize Fresh RSS
+  block:
+    - name: Run the Prepare Command for FreshRSS
+      ansible.builtin.command:
+        cmd: "./cli/prepare.php"
+        chdir: "{{ freshrss_dir }}"
+
+    - name: Make command execution for Install
+      set_fact:
+        fressrss_install_command_var: >-
+            ./cli/do-install.php
+            --default_user {{ freshrss_default_admin_user }}
+            [
+            --auth_type form
+            --environment production
+            --base_url {{ freshrss_base_url }}
+            --language en
+            --title FreshRSS
+            --allow_anonymous
+            --api_enabled
+            --db-type mysql
+            --db-host localhost:3306
+            --db-user {{ mariadb_dbuser }}
+            --db-password {{ mariadb_dbuser_pwd }}
+            --db-base {{ mariadb_dbname }}
+            --db-prefix freshrss
+            ]
+
+    - name: Print Install command
+      ansible.builtin.debug:
+        msg: "install command: {{ fressrss_install_command_var }}"
+
+    - name: Run the Install Command for FreshRSS
+      ansible.builtin.command:
+        cmd: "{{ fressrss_install_command_var }}"
+        chdir: "{{ freshrss_dir }}"
+
+    - name: Run the Reconfigure Command for FreshRSS
+      ansible.builtin.command:
+        cmd: "./cli/reconfigure.php"
+        chdir: "{{ freshrss_dir }}"
+
+    - name: Make command execution for Admin User
+      set_fact:
+        fressrss_install_command_var: >-
+            ./cli/create-user.php
+            --user {{ freshrss_admin_user }}
+            [
+            --password '{{ freshrss_admin_password }}'
+            --api_password '{{ freshrss_admin_password }}'
+            ]
+
+  when: not fresrss_config_init.stat.exists
+
+- name: Touch a file to demonstrate Fresh RSS has been initialized
+  ansible.builtin.file:
+    path: "{{ fresrss_config_init_path }}"
+    state: touch
+    mode: '0700'
+  when: not fresrss_config_init.stat.exists

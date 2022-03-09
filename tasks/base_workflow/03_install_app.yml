@@ -1,28 +1,96 @@
 ---
-- name: Create my_app directory
-  ansible.builtin.file:
-    path: "{{ my_app_dir }}"
-    state: directory
-    owner: "{{ my_app_service_user }}"
-    group: "{{ my_app_service_user }}"
-    mode: '700'
+# - name: Create freshrss directory
+#   ansible.builtin.file:
+#     path: "{{ freshrss_dir }}"
+#     state: directory
+#     owner: "{{ freshrss_service_user }}"
+#     group: "{{ freshrss_service_user }}"
+#     mode: '700'
 
-- name: Get Installer
+- name: Get Github Latest Release asset
+  block:
+    - name: Set fact for API target for Fresh RSS
+      ansible.builtin.set_fact:
+        freshrss_latest_api_target: "https://api.github.com/repos/{{ fresh_rss_repo }}/releases/latest"
+
+    - name: Get the latest tag from Github for Fresh RSS
+      ansible.builtin.uri:
+        url: "{{ freshrss_latest_api_target }}"
+      register: latest_release
+
+    - name: Print latest release details for Fresh RSS
+      ansible.builtin.debug:
+        msg: |
+          Release name: {{ latest_release.json.name }}
+          Release tag: {{ latest_release.json.tag_name }}
+
+    - name: Set variable for latest release tag
+      set_fact:
+        latest_release_tag: "{{ latest_release.json.tag_name }}"
+
+    - name: Set variable for latest release tag without 'v'
+      set_fact:
+        latest_release_semver: "{{ latest_release_tag | replace('v','') }}"
+  when: not freshrss_version
+
+- name: Set release version to user defined value
+  ansible.builtin.set_fact:
+    release_version: "{{ freshrss_version }}"
+  when: freshrss_version
+
+- name: Set release version to lastest version
+  ansible.builtin.set_fact:
+    release_version: "{{ latest_release_tag }}"
+  when: not freshrss_version
+
+- name: Download release
   ansible.builtin.get_url:
-    url: "{{ my_app_url }}"
-    dest: "{{ my_app_dir }}/{{ my_app_install_program }}"
-    force: true
-    owner: "{{ my_app_service_user }}"
-    group: "{{ my_app_service_user }}"
-    mode: "0700"
-    validate_certs: "true"
+    url: "https://github.com/{{ fresh_rss_repo }}/archive/refs/tags/{{ latest_release_semver }}.tar.gz"
+    dest: "{{ freshrss_temp_archive }}"
 
-- name: Install my_app
-  become_user: "{{ my_app_service_user }}"
-  ansible.builtin.expect:
-    command: "{{ my_app_install_command }}"
-    chdir: "{{ my_app_dir }}"
-    creates: "{{ my_app_install_artifact }}"
-    responses:
-      Question 1 String: "{{ external_domain }}"
-      Question 2 String: "n"
+- name: Print the value of the variable freshrss_temp_archive
+  ansible.builtin.debug:
+    msg: "freshrss_temp_archive: {{ freshrss_temp_archive }} "
+
+- name: Unzip FreshRSS
+  ansible.builtin.unarchive:
+    src: "{{ freshrss_temp_archive }}"
+    dest: "{{ freshrss_temp_dir }}"
+    remote_src: true
+
+- name: Remove archive
+  ansible.builtin.file:
+    path: "{{ freshrss_temp_archive }}"
+    state: absent
+
+- name: Find the Fresh RSS folder
+  ansible.builtin.find:
+    paths: "{{ freshrss_temp_dir }}"
+    patterns: "*FreshRSS*"
+    file_type: "directory"
+  register: find_results
+
+- name: Set fact to files
+  ansible.builtin.set_fact:
+    found_path: "{{ (find_results.files | first).path }}"
+
+- name: Copy to /opt
+  ansible.builtin.copy:
+    src: "{{ found_path }}/"
+    dest: "{{ freshrss_dir }}"
+    remote_src: true
+    force: true
+    owner: "{{ freshrss_service_user }}"
+    group: "{{ freshrss_service_user }}"
+    mode: "0700"
+
+- name: Install Nginx
+  ansible.builtin.apt:
+    name:
+      - nginx
+    state: present
+    update_cache: true
+  register: apt_status
+  until: apt_status is success
+  delay: 6
+  retries: 10

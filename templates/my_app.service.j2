@@ -1,14 +1,14 @@
 [Unit]
-Description={{ my_app_name | upper }}
+Description={{ freshrss_name | upper }}
 Requires=docker.service
 After=docker.service
 
 [Service]
 Type=oneshot
-User={{ my_app_service_user }}
-Group={{ my_app_service_user }}
-ExecStart={{ my_app_start_command }}
-ExecStop={{ my_app_stop_command }}
+User={{ freshrss_service_user }}
+Group={{ freshrss_service_user }}
+ExecStart={{ freshrss_start_command }}
+ExecStop={{ freshrss_stop_command }}
 RemainAfterExit=true
 
 [Install]

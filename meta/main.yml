@@ -1,8 +1,8 @@
 galaxy_info:
-  role_name: my_role
+  role_name: fresh_rss
   namespace: irontooch
   author: IronTooch
-  description: App_Description
+  description: A role to install Fresh RSS reader
   license: GPL-3.0-only
   min_ansible_version: 2.1
 
@@ -13,8 +13,7 @@ galaxy_info:
 
   galaxy_tags: []
 
-dependencies: []  # Remove [] if roles are included, below
-#   - role: 'my_namespace.my_role'
-#     vars:
-#       my_var: "my_value"
-
+dependencies:
+  - role: irontooch.maria_db
+    vars:
+      mariadb_app_name: "{{ freshrss_name }}"
