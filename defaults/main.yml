@@ -12,6 +12,8 @@ nginx_user: "www-data"
 freshrss_base_url: "rss.example.com"
 
 freshrss_admin_user: "freshrss_admin"
+freshrss_initialize: true
+freshrss_smallstep_certs: false
 
 freshrss_admin_user_folder: "{{ freshrss_dir }}/data/users/{{ freshrss_admin_user }}"
 

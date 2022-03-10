@@ -1,0 +1,8 @@
+---
+- name: Include Smallstep Client role
+  ansible.builtin.include_role:
+    name: irontooch.smaallstep_leafclient
+    allow_duplicates: true
+    public: false
+  vars:
+    freshrss_smallstep_certs: "nginx"

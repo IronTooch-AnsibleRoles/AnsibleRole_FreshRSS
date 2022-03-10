@@ -23,3 +23,32 @@ server {
     }
 
 }
+
+server {
+
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+
+    root /opt/freshrss/p/;
+    index index.php index.html index.htm;
+
+    access_log /var/log/nginx/freshrss_ssl.access.log;
+    error_log /var/log/nginx/freshrss_ssl.error.log;
+
+    include ssl-keys.conf;
+    include ssl-params.conf;
+
+    location / {
+        try_files $uri $uri/ index.php;
+    }
+
+    location ~ ^.+?\.php(/.*)?$ {
+        # fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:{{ phpfpm_socket }};
+
+        #fastcgi_split_path_info ^(.+\.php)(/.*)$;
+    }
+
+}

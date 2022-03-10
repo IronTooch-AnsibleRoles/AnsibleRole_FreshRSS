@@ -20,6 +20,7 @@
 #   ansible.builtin.include_tasks:
 #     file: "./base_workflow/05_deploy_services.yml"
 
-# - name: Deploy SSL overrides
-#   ansible.builtin.include_tasks:
-#     file: "./base_workflow/06_deploy_SSL.yml"
+- name: Deploy SSL
+  ansible.builtin.include_tasks:
+    file: "./base_workflow/06_deploy_SSL.yml"
+  when: freshrss_smallstep_certs

@@ -149,14 +149,14 @@
         chdir: "{{ freshrss_dir }}"
 
 
-  when: not fresrss_config_init.stat.exists
+  when: ((not fresrss_config_init.stat.exists) and (freshrss_initialize))
 
 - name: Touch a file to demonstrate Fresh RSS has been initialized
   ansible.builtin.file:
     path: "{{ fresrss_config_init_path }}"
     state: touch
     mode: '0700'
-  when: not fresrss_config_init.stat.exists
+  when: ((not fresrss_config_init.stat.exists) and (freshrss_initialize))
 
 - name: Chown freshrss P
   ansible.builtin.file:
