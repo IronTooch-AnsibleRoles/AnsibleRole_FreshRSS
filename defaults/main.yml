@@ -26,3 +26,6 @@ freshrss_service_user: "{{ freshrss_name }}_user"
 freshrss_dir: "/opt/{{ freshrss_name }}"
 freshrss_etc: "/etc/{{ freshrss_name }}"
 fresrss_config_init_path: "{{ freshrss_etc }}/config_initialized"
+
+# Change /etc/php/7.4/fpm/pool.d/www.conf
+# pm.max_children = 50
