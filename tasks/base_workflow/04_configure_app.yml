@@ -1,12 +1,11 @@
 ---
-
 - name: Make Fresh RSS Etc folder
   ansible.builtin.file:
     path: "{{ freshrss_etc }}"
     state: directory
-    user: "{{ freshrss_service_user }}"
-    group: "{{ freshrss_service_user }}"
     mode: '0755'
+    owner: '{{ freshrss_service_user }}'
+    group: '{{ freshrss_service_user }}'
 
 - name: Find the php socket
   ansible.builtin.find:
@@ -45,7 +44,7 @@
     recurse: true
     mode: '0755'
 
-- name: Chown freshrss P
+- name: Chown freshrss data
   ansible.builtin.file:
     path: "{{ freshrss_dir }}/data"
     state: directory
@@ -91,16 +90,16 @@
 
 - name: Initialize Fresh RSS
   block:
-    - name: Run the Prepare Command for FreshRSS
-      ansible.builtin.command:
-        cmd: "./cli/prepare.php"
-        chdir: "{{ freshrss_dir }}"
+    # - name: Run the Prepare Command for FreshRSS
+    #   ansible.builtin.command:
+    #     cmd: "./cli/prepare.php"
+    #     chdir: "{{ freshrss_dir }}"
 
     - name: Make command execution for Install
       set_fact:
         fressrss_install_command_var: >-
             ./cli/do-install.php
-            --default_user {{ freshrss_default_admin_user }}
+            --default_user {{ freshrss_admin_user }}
             [
             --auth_type form
             --environment production
@@ -122,24 +121,33 @@
         msg: "install command: {{ fressrss_install_command_var }}"
 
     - name: Run the Install Command for FreshRSS
-      ansible.builtin.command:
+      ansible.builtin.shell:
         cmd: "{{ fressrss_install_command_var }}"
         chdir: "{{ freshrss_dir }}"
 
-    - name: Run the Reconfigure Command for FreshRSS
-      ansible.builtin.command:
-        cmd: "./cli/reconfigure.php"
-        chdir: "{{ freshrss_dir }}"
+    - name: Print the value of the variable freshrss_admin_password
+      ansible.builtin.debug:
+        msg: "freshrss_admin_password: {{ freshrss_admin_password }} "
 
     - name: Make command execution for Admin User
       set_fact:
-        fressrss_install_command_var: >-
+        fressrss_makeuser_command_var: >-
             ./cli/create-user.php
             --user {{ freshrss_admin_user }}
             [
             --password '{{ freshrss_admin_password }}'
-            --api_password '{{ freshrss_admin_password }}'
             ]
+
+    - name: Print the value of the variable fressrss_makeuser_command_var
+      ansible.builtin.debug:
+        msg: "fressrss_makeuser_command_var: {{ fressrss_makeuser_command_var }} "
+
+
+    - name: Run the Make User Command for FreshRSS
+      ansible.builtin.shell:
+        cmd: "{{ fressrss_makeuser_command_var }}"
+        chdir: "{{ freshrss_dir }}"
+
 
   when: not fresrss_config_init.stat.exists
 
@@ -149,3 +157,26 @@
     state: touch
     mode: '0700'
   when: not fresrss_config_init.stat.exists
+
+- name: Chown freshrss P
+  ansible.builtin.file:
+    path: "{{ freshrss_dir }}/p"
+    state: directory
+    recurse: true
+    owner: '{{ nginx_user }}'
+    group: '{{ nginx_user }}'
+
+- name: Change the directory permissions for Fresh RSS dir
+  ansible.builtin.file:
+    path: "{{ freshrss_dir }}"
+    state: directory
+    recurse: true
+    mode: '0755'
+
+- name: Chown freshrss data
+  ansible.builtin.file:
+    path: "{{ freshrss_dir }}/data"
+    state: directory
+    recurse: true
+    owner: '{{ nginx_user }}'
+    group: '{{ nginx_user }}'

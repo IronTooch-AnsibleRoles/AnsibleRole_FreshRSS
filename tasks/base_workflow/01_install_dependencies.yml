@@ -21,6 +21,7 @@
       - php-opcache
       - php-phar
       - php-simplexml
+      - php-sqlite3
       - php-xmlreader
       - php-xmlwriter
       - php-tokenizer
