@@ -5,4 +5,4 @@
     allow_duplicates: true
     public: false
   vars:
-    freshrss_smallstep_certs: "nginx"
+    smallstep_dependent_service: "nginx"

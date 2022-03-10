@@ -28,7 +28,6 @@
   ansible.builtin.set_fact:
     mariadb_dbuser_pwd: "{{ mariadb_dbuser_pwd_raw.content }}"
 
-
 - name: Chown freshrss P
   ansible.builtin.file:
     path: "{{ freshrss_dir }}/p"
@@ -83,6 +82,16 @@
   when: freshrss_local_user_password_path
   no_log: true
 
+- name: Make Encrypted Password for Fresh RSS
+  ansible.builtin.set_fact:
+    freshrss_admin_enc_pw: "{{ freshrss_admin_password | password_hash('bcrypt', rounds=9) }}"
+  no_log: true
+
+- name: Print the value of the variable freshrss_admin_enc_pw
+  ansible.builtin.debug:
+    msg: "freshrss_admin_enc_pw: {{ freshrss_admin_enc_pw }} "
+
+
 - name: Check if Fresh RSS has been initialized
   ansible.builtin.stat:
     path: "{{ fresrss_config_init_path }}"
@@ -90,10 +99,6 @@
 
 - name: Initialize Fresh RSS
   block:
-    # - name: Run the Prepare Command for FreshRSS
-    #   ansible.builtin.command:
-    #     cmd: "./cli/prepare.php"
-    #     chdir: "{{ freshrss_dir }}"
 
     - name: Make command execution for Install
       set_fact:
@@ -115,19 +120,13 @@
             --db-base {{ mariadb_dbname }}
             --db-prefix freshrss
             ]
-
-    - name: Print Install command
-      ansible.builtin.debug:
-        msg: "install command: {{ fressrss_install_command_var }}"
+      no_log: true
 
     - name: Run the Install Command for FreshRSS
       ansible.builtin.shell:
         cmd: "{{ fressrss_install_command_var }}"
         chdir: "{{ freshrss_dir }}"
-
-    - name: Print the value of the variable freshrss_admin_password
-      ansible.builtin.debug:
-        msg: "freshrss_admin_password: {{ freshrss_admin_password }} "
+      no_log: true
 
     - name: Make command execution for Admin User
       set_fact:
@@ -137,17 +136,33 @@
             [
             --password '{{ freshrss_admin_password }}'
             ]
-
-    - name: Print the value of the variable fressrss_makeuser_command_var
-      ansible.builtin.debug:
-        msg: "fressrss_makeuser_command_var: {{ fressrss_makeuser_command_var }} "
-
+      no_log: true
 
     - name: Run the Make User Command for FreshRSS
       ansible.builtin.shell:
         cmd: "{{ fressrss_makeuser_command_var }}"
         chdir: "{{ freshrss_dir }}"
+      no_log: true
 
+    - name: Make new salt for actual config file (since most of CLI doesn't work)
+      ansible.builtin.set_fact:
+        freshrss_newsalt: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=40') }}"
+
+    - name: Template out new config file
+      ansible.builtin.template:
+        src: config.php.j2
+        dest: "{{ freshrss_dir }}/data/config.php"
+        force: true
+        mode: '0770'
+      no_log: true
+
+    - name: Template out new user file
+      ansible.builtin.template:
+        src: user.config.php.j2
+        dest: "{{ freshrss_admin_user_folder }}/config.php"
+        force: true
+        mode: '0770'
+      no_log: true
 
   when: ((not fresrss_config_init.stat.exists) and (freshrss_initialize))
 
