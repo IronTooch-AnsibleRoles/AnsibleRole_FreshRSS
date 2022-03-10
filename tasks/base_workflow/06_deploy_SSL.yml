@@ -1,7 +1,7 @@
 ---
 - name: Include Smallstep Client role
   ansible.builtin.include_role:
-    name: irontooch.smaallstep_leafclient
+    name: irontooch.smallstep_leafclient
     allow_duplicates: true
     public: false
   vars:
